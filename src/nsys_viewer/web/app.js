@@ -403,7 +403,7 @@ $("#reload-btn").addEventListener("click", loadFiles);
 $("#group-by").addEventListener("change", (e) => { state.groupBy = e.target.value; refresh(); });
 $("#limit").addEventListener("change", (e) => {
   const v = parseInt(e.target.value, 10);
-  if (Number.isFinite(v) && v > 0) { state.limit = v; refresh(); }
+  if (Number.isFinite(v) && v >= 1) { state.limit = v; refresh(); }
 });
 
 let searchTimer = null;

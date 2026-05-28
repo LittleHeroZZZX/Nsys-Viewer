@@ -52,7 +52,7 @@ def create_app(root: Path) -> FastAPI:
     def api_kernels(
         file: str,
         group_by: str = Query("demangled", pattern="^(demangled|short)$"),
-        limit: int = Query(200, ge=1, le=5000),
+        limit: int = Query(200, ge=1, le=100000),
         regex: str = Query(""),
     ) -> JSONResponse:
         p = resolve_file(file)
@@ -65,7 +65,7 @@ def create_app(root: Path) -> FastAPI:
     def api_compare(
         files: str,
         group_by: str = Query("short", pattern="^(demangled|short)$"),
-        limit: int = Query(200, ge=1, le=5000),
+        limit: int = Query(200, ge=1, le=100000),
         regex: list[str] = Query(default=[]),
     ) -> JSONResponse:
         names = [s for s in files.split(",") if s]
