@@ -107,6 +107,21 @@ a { color: var(--accent); }
 .pane-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
 .pane-head h2 { font-size: 14px; margin: 0; font-weight: 600; }
 
+.sum-row {
+  display: flex; flex-wrap: wrap; gap: 5px; align-items: center;
+  margin-bottom: 8px;
+}
+.sum-label { font-size: 11px; color: var(--muted); font-weight: 500; white-space: nowrap; }
+.sum-chip {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-variant-numeric: tabular-nums;
+  background: var(--bg-3); border: 1px solid var(--line); color: var(--muted);
+}
+.sum-chip.good { color: var(--good); border-color: rgba(121,226,192,0.35); }
+.sum-chip.bad  { color: var(--bad);  border-color: rgba(255,122,144,0.35); }
+.sum-chip.warn { color: var(--warn); border-color: rgba(255,184,107,0.35); }
+.sum-chip.info { color: var(--accent); border-color: rgba(90,169,255,0.35); }
+
 .table-wrap { background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; overflow: auto; }
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 th, td { padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }

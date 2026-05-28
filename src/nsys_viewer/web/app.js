@@ -138,6 +138,7 @@ async function refresh() {
     $("#threshold-group").classList.add("hidden");
     if (!state.single) {
       renderCards([]);
+      $("#single-summary").innerHTML = "";
       $("#single-table-wrap").innerHTML = "<div class='empty'>No file selected.</div>";
       return;
     }
@@ -151,7 +152,7 @@ async function refresh() {
       fetchJSON(`/api/kernels?${params}`),
     ]);
     renderCards([ov]);
-    renderSingle(ks);
+    renderSingle(ks, ov);
   } else {
     $("#single-pane").classList.add("hidden");
     $("#compare-pane").classList.remove("hidden");
@@ -159,6 +160,7 @@ async function refresh() {
     const files = [...state.compare];
     if (files.length === 0) {
       renderCards([]);
+      $("#compare-summary").innerHTML = "";
       $("#compare-table-wrap").innerHTML = "<div class='empty'>Select 1+ files.</div>";
       return;
     }
@@ -222,8 +224,75 @@ function isDeltaSignificant(delta, baseline) {
   return !withinThreshold;
 }
 
-function renderSingle(data) {
+function renderSingleSummary(ov, rows) {
+  const el = $("#single-summary");
+  if (!rows.length || !ov) { el.innerHTML = ""; return; }
+  const shownNs  = rows.reduce((s, r) => s + (r.total_ns || 0), 0);
+  const launches = rows.reduce((s, r) => s + (r.cnt     || 0), 0);
+  const covPct   = ov.kernel_total_ns > 0 ? shownNs / ov.kernel_total_ns * 100 : 0;
+  const avgNs    = launches > 0 ? shownNs / launches : 0;
+  const minAvg   = Math.min(...rows.map((r) => r.avg_ns || 0));
+  const maxAvg   = Math.max(...rows.map((r) => r.avg_ns || 0));
+  const covCls   = covPct >= 90 ? "good" : covPct >= 70 ? "info" : "warn";
+  el.innerHTML = `<div class="sum-row">
+    <span class="sum-chip">${rows.length} types · ${fmt.int(launches)} launches</span>
+    <span class="sum-chip info">shown ${fmt.ns(shownNs)}</span>
+    <span class="sum-chip ${covCls}">coverage ${covPct.toFixed(1)}%</span>
+    <span class="sum-chip">avg ${fmt.ns(avgNs)} / launch</span>
+    <span class="sum-chip">range ${fmt.ns(minAvg)} – ${fmt.ns(maxAvg)}</span>
+  </div>`;
+}
+
+function renderCompareSummary(rows, files) {
+  const el = $("#compare-summary");
+  if (!rows.length || files.length < 2) { el.innerHTML = ""; return; }
+  let html = "";
+  for (let j = 1; j < files.length; j++) {
+    let matched = 0, onlyBase = 0, onlyThis = 0;
+    let slower = 0, faster = 0, same = 0;
+    let baseNs = 0, thisNs = 0, overhead = 0, savings = 0;
+    for (const r of rows) {
+      const b = r.totals[0] || 0;
+      const t = r.totals[j] || 0;
+      if (b > 0 && t > 0) {
+        matched++; baseNs += b; thisNs += t;
+        const d = t - b;
+        if (isDeltaSignificant(d, b)) {
+          if (d > 0) { slower++; overhead += d; }
+          else       { faster++; savings  += -d; }
+        } else { same++; }
+      } else if (b > 0) { onlyBase++; }
+      else if (t > 0)   { onlyThis++; }
+    }
+    const net    = thisNs - baseNs;
+    const netPct = baseNs > 0 ? net / baseNs * 100 : null;
+    const sign   = net > 0 ? "+" : "";
+    const netCls = net < 0 ? "good" : net > 0 ? "bad" : "";
+    const pctStr = netPct !== null ? ` (${sign}${netPct.toFixed(1)}%)` : "";
+
+    const chips = [];
+    chips.push(`<span class="sum-chip ${netCls}">net ${sign}${fmt.ns(net)}${pctStr}</span>`);
+    chips.push(`<span class="sum-chip">baseline ${fmt.ns(baseNs)} → ${fmt.ns(thisNs)}</span>`);
+    if (slower > 0) chips.push(`<span class="sum-chip bad">${slower} slower +${fmt.ns(overhead)}</span>`);
+    if (faster > 0) chips.push(`<span class="sum-chip good">${faster} faster −${fmt.ns(savings)}</span>`);
+    if (same   > 0) chips.push(`<span class="sum-chip">${same} unchanged</span>`);
+    const extras = [];
+    if (onlyThis > 0) extras.push(`${onlyThis} new`);
+    if (onlyBase > 0) extras.push(`${onlyBase} gone`);
+    if (extras.length) chips.push(`<span class="sum-chip warn">${extras.join(" · ")}</span>`);
+    if (matched > 0) chips.push(`<span class="sum-chip">${matched} matched</span>`);
+
+    html += `<div class="sum-row">
+      <span class="sum-label">vs ${escapeHtml(files[j])}:</span>
+      ${chips.join("")}
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderSingle(data, ov) {
   const rows = filterBySearch(data.rows);
+  renderSingleSummary(ov, rows);
   $("#single-meta").textContent = `${rows.length} rows · group_by=${data.group_by}`;
   if (rows.length === 0) {
     $("#single-table-wrap").innerHTML = "<div class='empty'>No matching kernels.</div>";
@@ -258,6 +327,7 @@ function renderSingle(data) {
 function renderCompare(data) {
   const files = data.files;
   const rows = filterBySearch(data.rows);
+  renderCompareSummary(rows, files);
   $("#compare-meta").textContent = `${rows.length} rows · ${files.length} files · baseline = ${files[0]}`;
   if (rows.length === 0) {
     $("#compare-table-wrap").innerHTML = "<div class='empty'>No matching kernels.</div>";
