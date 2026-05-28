@@ -53,9 +53,12 @@ def create_app(root: Path) -> FastAPI:
         file: str,
         group_by: str = Query("demangled", pattern="^(demangled|short)$"),
         limit: int = Query(200, ge=1, le=5000),
+        regex: str = Query(""),
     ) -> JSONResponse:
         p = resolve_file(file)
         rows = db.kernel_summary(str(p), group_by=group_by)
+        if regex:
+            rows = db._filter_by_regex(rows, regex)
         return JSONResponse({"file": file, "group_by": group_by, "rows": rows[:limit]})
 
     @app.get("/api/compare")
@@ -63,12 +66,13 @@ def create_app(root: Path) -> FastAPI:
         files: str,
         group_by: str = Query("short", pattern="^(demangled|short)$"),
         limit: int = Query(200, ge=1, le=5000),
+        regex: list[str] = Query(default=[]),
     ) -> JSONResponse:
         names = [s for s in files.split(",") if s]
         if not names:
             raise HTTPException(status_code=400, detail="files= required")
         paths = [str(resolve_file(n)) for n in names]
-        data = db.compare_kernels(paths, group_by=group_by)
+        data = db.compare_kernels(paths, group_by=group_by, filters=regex or None)
         data["rows"] = data["rows"][:limit]
         return JSONResponse(data)
 

@@ -63,23 +63,35 @@ a { color: var(--accent); }
 
 .file-list { list-style: none; margin: 0; padding: 6px; overflow: auto; flex: 1; }
 .file-item {
-  display: flex; align-items: center; gap: 8px;
-  padding: 6px 8px; border-radius: 4px; cursor: pointer;
+  display: flex; flex-direction: column;
+  padding: 4px 8px; border-radius: 4px; cursor: pointer;
 }
 .file-item:hover { background: var(--bg-3); }
 .file-item.active { background: rgba(90, 169, 255, 0.18); }
 .file-item input[type=checkbox] { accent-color: var(--accent); }
 .file-item input[type=radio]    { accent-color: var(--accent-2); }
-.file-item .file-name { flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
-.file-item .file-meta { font-size: 11px; color: var(--muted); }
+.file-row { display: flex; align-items: center; gap: 8px; }
+.file-row .file-name { flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.file-row .file-meta { font-size: 11px; color: var(--muted); }
+.file-filter {
+  width: 100%; margin-top: 3px;
+  background: var(--bg); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 3px;
+  padding: 2px 6px; font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.file-filter:focus { outline: none; border-color: var(--accent); }
+.file-filter.invalid-regex { border-color: var(--bad); }
 
 .side-foot { border-top: 1px solid var(--line); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
 .side-foot .row { display: flex; align-items: center; gap: 8px; }
-.side-foot .row span { color: var(--muted); width: 60px; }
+.side-foot .row span { color: var(--muted); width: 60px; flex-shrink: 0; }
 .side-foot input, .side-foot select {
   flex: 1; background: var(--bg-3); color: var(--fg); border: 1px solid var(--line);
   border-radius: 4px; padding: 4px 6px; font-size: 12px;
 }
+.side-foot input.invalid-regex { border-color: var(--bad); }
+.side-divider { border-top: 1px solid var(--line); margin: 0; }
 
 .content { overflow: auto; padding: 16px 20px; min-width: 0; }
 

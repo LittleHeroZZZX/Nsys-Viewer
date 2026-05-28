@@ -7,7 +7,10 @@ const state = {
   compare: new Set(),      // names selected for compare
   groupBy: "short",
   limit: 50,
-  search: "",
+  search: "",              // global client-side name filter (regex)
+  compareFilters: {},      // {filename: regexStr} — per-source server-side filter
+  thresholdAbs: 0,         // ns; 0 = disabled
+  thresholdRel: 0,         // fraction (0.05 = 5%); 0 = disabled
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -47,6 +50,14 @@ async function loadFiles() {
   await refresh();
 }
 
+let filterTimer = null;
+
+function validateRegexInput(el, pattern) {
+  if (!pattern) { el.classList.remove("invalid-regex"); return; }
+  try { new RegExp(pattern); el.classList.remove("invalid-regex"); }
+  catch (_) { el.classList.add("invalid-regex"); }
+}
+
 function renderFileList() {
   const ul = $("#file-list");
   ul.innerHTML = "";
@@ -56,6 +67,9 @@ function renderFileList() {
     const isActive =
       state.mode === "single" ? state.single === f.name : state.compare.has(f.name);
     if (isActive) li.classList.add("active");
+
+    const row = document.createElement("div");
+    row.className = "file-row";
 
     const input = document.createElement("input");
     if (state.mode === "single") {
@@ -77,22 +91,42 @@ function renderFileList() {
         refresh();
       });
     }
-    li.appendChild(input);
+    row.appendChild(input);
 
     const name = document.createElement("span");
     name.className = "file-name";
     name.textContent = f.name;
-    li.appendChild(name);
+    row.appendChild(name);
 
     const meta = document.createElement("span");
     meta.className = "file-meta";
     meta.textContent = fmt.bytes(f.size_bytes);
-    li.appendChild(meta);
+    row.appendChild(meta);
 
-    li.addEventListener("click", (e) => {
+    row.addEventListener("click", (e) => {
       if (e.target === input) return;
       input.click();
     });
+    li.appendChild(row);
+
+    // per-file regex filter input — only in compare mode for checked files
+    if (state.mode === "compare" && state.compare.has(f.name)) {
+      const fi = document.createElement("input");
+      fi.type = "search";
+      fi.className = "file-filter";
+      fi.placeholder = "filter regex…";
+      fi.value = state.compareFilters[f.name] || "";
+      fi.addEventListener("click", (e) => e.stopPropagation());
+      fi.addEventListener("input", (e) => {
+        const val = e.target.value.trim();
+        validateRegexInput(fi, val);
+        state.compareFilters[f.name] = val;
+        clearTimeout(filterTimer);
+        filterTimer = setTimeout(refresh, 200);
+      });
+      li.appendChild(fi);
+    }
+
     ul.appendChild(li);
   }
 }
@@ -101,22 +135,27 @@ async function refresh() {
   if (state.mode === "single") {
     $("#single-pane").classList.remove("hidden");
     $("#compare-pane").classList.add("hidden");
+    $("#threshold-group").classList.add("hidden");
     if (!state.single) {
       renderCards([]);
       $("#single-table-wrap").innerHTML = "<div class='empty'>No file selected.</div>";
       return;
     }
+    const params = new URLSearchParams({
+      file: state.single,
+      group_by: state.groupBy,
+      limit: state.limit,
+    });
     const [ov, ks] = await Promise.all([
       fetchJSON(`/api/overview?file=${encodeURIComponent(state.single)}`),
-      fetchJSON(
-        `/api/kernels?file=${encodeURIComponent(state.single)}&group_by=${state.groupBy}&limit=${state.limit}`,
-      ),
+      fetchJSON(`/api/kernels?${params}`),
     ]);
     renderCards([ov]);
     renderSingle(ks);
   } else {
     $("#single-pane").classList.add("hidden");
     $("#compare-pane").classList.remove("hidden");
+    $("#threshold-group").classList.remove("hidden");
     const files = [...state.compare];
     if (files.length === 0) {
       renderCards([]);
@@ -127,9 +166,16 @@ async function refresh() {
       files.map((f) => fetchJSON(`/api/overview?file=${encodeURIComponent(f)}`)),
     );
     renderCards(ovs);
-    const data = await fetchJSON(
-      `/api/compare?files=${files.map(encodeURIComponent).join(",")}&group_by=${state.groupBy}&limit=${state.limit}`,
-    );
+
+    const params = new URLSearchParams({
+      files: files.join(","),
+      group_by: state.groupBy,
+      limit: state.limit,
+    });
+    for (const f of files) {
+      params.append("regex", state.compareFilters[f] || "");
+    }
+    const data = await fetchJSON(`/api/compare?${params}`);
     renderCompare(data);
   }
 }
@@ -153,8 +199,27 @@ function renderCards(overviews) {
 
 function filterBySearch(rows) {
   if (!state.search) return rows;
-  const q = state.search.toLowerCase();
-  return rows.filter((r) => r.name.toLowerCase().includes(q));
+  try {
+    const rx = new RegExp(state.search, "i");
+    return rows.filter((r) => rx.test(r.name));
+  } catch (_) {
+    const q = state.search.toLowerCase();
+    return rows.filter((r) => r.name.toLowerCase().includes(q));
+  }
+}
+
+// Returns true if the delta should be styled (significant), false if suppressed by threshold.
+function isDeltaSignificant(delta, baseline) {
+  if (delta === 0) return false;
+  const absEnabled = state.thresholdAbs > 0;
+  const relEnabled = state.thresholdRel > 0;
+  if (!absEnabled && !relEnabled) return true;
+  let withinThreshold = true;
+  if (absEnabled) withinThreshold = withinThreshold && Math.abs(delta) <= state.thresholdAbs;
+  if (relEnabled && baseline > 0) {
+    withinThreshold = withinThreshold && Math.abs(delta / baseline) <= state.thresholdRel;
+  }
+  return !withinThreshold;
 }
 
 function renderSingle(data) {
@@ -212,8 +277,10 @@ function renderCompare(data) {
     for (let i = 0; i < files.length; i++) {
       const t = r.totals[i] || 0;
       const w = Math.max(0, Math.round((t / maxRow) * 140));
-      const deltaClass =
-        i > 0 && baseline ? (t > baseline ? "delta-up" : t < baseline ? "delta-down" : "") : "";
+      let deltaClass = "";
+      if (i > 0 && baseline > 0 && isDeltaSignificant(t - baseline, baseline)) {
+        deltaClass = t > baseline ? "delta-up" : t < baseline ? "delta-down" : "";
+      }
       html += `<td>
         <span class="bar ${deltaClass}" style="width:${w}px"></span>${fmt.ns(t)}
         <span class="cell-pct">×${r.counts[i] || 0}</span>
@@ -224,14 +291,13 @@ function renderCompare(data) {
       const delta = last - baseline;
       let label = "—";
       let cls = "";
-      if (baseline > 0) {
-        const pct = (delta / baseline) * 100;
-        cls = delta > 0 ? "up" : delta < 0 ? "down" : "";
-        const sign = delta > 0 ? "+" : "";
-        label = `${sign}${pct.toFixed(1)}%`;
-      } else if (last > 0) {
+      if (baseline <= 0 && last > 0) {
         cls = "up";
         label = "new";
+      } else if (baseline > 0 && isDeltaSignificant(delta, baseline)) {
+        const pct = (delta / baseline) * 100;
+        cls = delta > 0 ? "up" : "down";
+        label = `${delta > 0 ? "+" : ""}${pct.toFixed(1)}%`;
       }
       html += `<td><span class="delta ${cls}">${label}</span></td>`;
     }
@@ -274,11 +340,24 @@ $("#limit").addEventListener("change", (e) => {
 
 let searchTimer = null;
 $("#search").addEventListener("input", (e) => {
+  const val = e.target.value.trim();
+  validateRegexInput(e.target, val);
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => {
-    state.search = e.target.value.trim();
+    state.search = val;
     refresh();
   }, 150);
+});
+
+$("#thresh-abs").addEventListener("change", (e) => {
+  const v = parseFloat(e.target.value);
+  state.thresholdAbs = Number.isFinite(v) && v > 0 ? v * 1000 : 0; // µs → ns
+  refresh();
+});
+$("#thresh-rel").addEventListener("change", (e) => {
+  const v = parseFloat(e.target.value);
+  state.thresholdRel = Number.isFinite(v) && v > 0 ? v / 100 : 0; // % → fraction
+  refresh();
 });
 
 loadFiles().catch((err) => {

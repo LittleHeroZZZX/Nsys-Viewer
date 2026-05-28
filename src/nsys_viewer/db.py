@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from dataclasses import dataclass
 from functools import lru_cache
@@ -30,6 +31,16 @@ def _open(path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(uri, uri=True)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def _filter_by_regex(rows: list[dict[str, Any]], pattern: str) -> list[dict[str, Any]]:
+    if not pattern:
+        return rows
+    try:
+        rx = re.compile(pattern, re.IGNORECASE)
+        return [r for r in rows if rx.search(r["name"])]
+    except re.error:
+        return rows
 
 
 def _has_table(conn: sqlite3.Connection, name: str) -> bool:
@@ -130,7 +141,7 @@ def kernel_summary(path_str: str, group_by: str = "demangled") -> list[dict[str,
 
 
 def compare_kernels(
-    path_strs: list[str], group_by: str = "short"
+    path_strs: list[str], group_by: str = "short", filters: list[str] | None = None
 ) -> dict[str, Any]:
     """Build a side-by-side comparison.
 
@@ -143,8 +154,11 @@ def compare_kernels(
     """
     per_file: list[dict[str, dict[str, Any]]] = []
     file_names: list[str] = []
-    for p in path_strs:
+    for i, p in enumerate(path_strs):
         summary = kernel_summary(p, group_by=group_by)
+        pattern = filters[i] if filters and i < len(filters) else ""
+        if pattern:
+            summary = _filter_by_regex(summary, pattern)
         per_file.append({r["name"]: r for r in summary})
         file_names.append(Path(p).stem)
 
