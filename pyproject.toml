@@ -1,0 +1,20 @@
+[project]
+name = "nsys-viewer"
+version = "0.1.0"
+description = "Visualize and compare NVIDIA Nsight Systems (nsys) sqlite profiles, focused on CUDA kernels."
+readme = "README.md"
+authors = [
+    { name = "zhouxin.2000", email = "zhouxin.2000@bytedance.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+]
+
+[project.scripts]
+nsys-viewer = "nsys_viewer.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11.12,<0.12.0"]
+build-backend = "uv_build"

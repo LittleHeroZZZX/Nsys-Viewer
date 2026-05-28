@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>nsys-viewer</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>nsys-viewer</h1>
+    <span class="muted" id="root-label"></span>
+    <span class="spacer"></span>
+    <div class="seg" role="tablist">
+      <button data-mode="single" class="seg-btn active">Single file</button>
+      <button data-mode="compare" class="seg-btn">Compare</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <div class="side-head">
+        <span>Profiles</span>
+        <button id="reload-btn" title="Reload file list">↻</button>
+      </div>
+      <ul id="file-list" class="file-list"></ul>
+      <div class="side-foot">
+        <label class="row">
+          <span>Group&nbsp;by</span>
+          <select id="group-by">
+            <option value="demangled">Demangled (full)</option>
+            <option value="short" selected>Short name</option>
+          </select>
+        </label>
+        <label class="row">
+          <span>Top&nbsp;N</span>
+          <input id="limit" type="number" min="10" max="2000" value="50" />
+        </label>
+        <label class="row">
+          <span>Search</span>
+          <input id="search" type="search" placeholder="kernel name…" />
+        </label>
+      </div>
+    </aside>
+
+    <section class="content">
+      <div id="overview-cards" class="cards"></div>
+      <div id="single-pane" class="pane">
+        <div class="pane-head">
+          <h2>Kernel summary</h2>
+          <span class="muted" id="single-meta"></span>
+        </div>
+        <div id="single-table-wrap" class="table-wrap"></div>
+      </div>
+      <div id="compare-pane" class="pane hidden">
+        <div class="pane-head">
+          <h2>Kernel comparison</h2>
+          <span class="muted" id="compare-meta"></span>
+        </div>
+        <div id="compare-table-wrap" class="table-wrap"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
