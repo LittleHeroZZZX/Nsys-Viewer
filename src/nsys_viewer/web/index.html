@@ -40,17 +40,6 @@
           <span>Search</span>
           <input id="search" type="search" placeholder="regex…" />
         </label>
-        <div id="threshold-group" class="hidden">
-          <div class="side-divider"></div>
-          <label class="row">
-            <span>Abs&nbsp;(µs)</span>
-            <input id="thresh-abs" type="number" min="0" step="100" value="0" title="Suppress diff if |Δ| ≤ this (µs). 0 = off" />
-          </label>
-          <label class="row">
-            <span>Rel&nbsp;(%)</span>
-            <input id="thresh-rel" type="number" min="0" max="100" step="1" value="0" title="Suppress diff if |Δ/baseline| ≤ this (%). 0 = off" />
-          </label>
-        </div>
       </div>
     </aside>
 
@@ -68,6 +57,13 @@
         <div class="pane-head">
           <h2>Kernel comparison</h2>
           <span class="muted" id="compare-meta"></span>
+        </div>
+        <div class="thresh-row">
+          <span>Δ threshold:</span>
+          <label>Abs <input id="thresh-abs" type="number" min="0" step="100" value="0"
+            title="Suppress diff coloring if |Δ| ≤ this. 0 = off" /> µs</label>
+          <label>Rel <input id="thresh-rel" type="number" min="0" max="100" step="1" value="0"
+            title="Suppress diff coloring if |Δ/baseline| ≤ this. 0 = off" /> %</label>
         </div>
         <div id="compare-summary"></div>
         <div id="compare-table-wrap" class="table-wrap"></div>

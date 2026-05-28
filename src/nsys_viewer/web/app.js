@@ -135,7 +135,6 @@ async function refresh() {
   if (state.mode === "single") {
     $("#single-pane").classList.remove("hidden");
     $("#compare-pane").classList.add("hidden");
-    $("#threshold-group").classList.add("hidden");
     if (!state.single) {
       renderCards([]);
       $("#single-summary").innerHTML = "";
@@ -156,7 +155,6 @@ async function refresh() {
   } else {
     $("#single-pane").classList.add("hidden");
     $("#compare-pane").classList.remove("hidden");
-    $("#threshold-group").classList.remove("hidden");
     const files = [...state.compare];
     if (files.length === 0) {
       renderCards([]);
